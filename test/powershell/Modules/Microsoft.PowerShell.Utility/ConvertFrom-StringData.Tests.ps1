@@ -13,39 +13,39 @@ def=content of def
 }
 
 Describe "ConvertFrom-StringData" -Tags "CI" {
-    $sampleData = @'
+        $sampleData = @'
 foo  = 0
 bar  = 1
 bazz = 2
 '@
 
     It "Should not throw when called with just the stringdata switch" {
-	{ ConvertFrom-StringData -StringData 'a=b' } | Should -Not -Throw
+        { ConvertFrom-StringData -StringData 'a=b' } | Should -Not -Throw
     }
 
     It "Should return a hashtable" {
-	$result = ConvertFrom-StringData -StringData 'a=b'
-    $result | Should -BeOfType Hashtable
+        $result = ConvertFrom-StringData -StringData 'a=b'
+        $result | Should -BeOfType Hashtable
     }
 
     It "Should throw if not in x=y format" {
-	{ ConvertFrom-StringData -StringData 'ab' }  | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
-	{ ConvertFrom-StringData -StringData 'a,b' } | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
-	{ ConvertFrom-StringData -StringData 'a b' } | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
-	{ ConvertFrom-StringData -StringData 'a\tb' } | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
-	{ ConvertFrom-StringData -StringData 'a:b' } | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
+        { ConvertFrom-StringData -StringData 'ab' }  | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
+        { ConvertFrom-StringData -StringData 'a,b' } | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
+        { ConvertFrom-StringData -StringData 'a b' } | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
+        { ConvertFrom-StringData -StringData 'a\tb' } | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
+        { ConvertFrom-StringData -StringData 'a:b' } | Should -Throw -ErrorId "InvalidOperation,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand"
     }
 
     It "Should return the data on the left side in the key" {
-	$actualValue = ConvertFrom-StringData -StringData 'a=b'
+        $actualValue = ConvertFrom-StringData -StringData 'a=b'
 
-	$actualValue.Keys | Should -BeExactly "a"
+        $actualValue.Keys | Should -BeExactly "a"
     }
 
     It "Should return the data on the right side in the value" {
-	$actualValue = ConvertFrom-StringData -StringData 'a=b'
+        $actualValue = ConvertFrom-StringData -StringData 'a=b'
 
-	$actualValue.Values | Should -BeExactly "b"
+        $actualValue.Values | Should -BeExactly "b"
     }
 
     It "Should return a keycollection for the keys" {
@@ -53,16 +53,16 @@ bazz = 2
     }
 
     It "Should return a valuecollection for the values" {
-	$(ConvertFrom-StringData -StringData 'a=b').Values.PSObject.TypeNames[0] | Should -BeExactly "System.Collections.Hashtable+ValueCollection"
+        $(ConvertFrom-StringData -StringData 'a=b').Values.PSObject.TypeNames[0] | Should -BeExactly "System.Collections.Hashtable+ValueCollection"
     }
 
     It "Should work for multiple lines" {
-	{ ConvertFrom-StringData -StringData $sampleData } | Should -Not -Throw
+        { ConvertFrom-StringData -StringData $sampleData } | Should -Not -Throw
 
-    # keys are not order guaranteed
-	$(ConvertFrom-StringData -StringData $sampleData).Keys   | Should -BeIn @("foo", "bar", "bazz")
+        # keys are not order guaranteed
+        $(ConvertFrom-StringData -StringData $sampleData).Keys   | Should -BeIn @("foo", "bar", "bazz")
 
-	$(ConvertFrom-StringData -StringData $sampleData).Values | Should -BeIn @("0","1","2")
+        $(ConvertFrom-StringData -StringData $sampleData).Values | Should -BeIn @("0","1","2")
     }
 }
 
@@ -93,6 +93,37 @@ a:b
         param($Delimiter, $StringData, $ExpectedResult)
 
         $Result = ConvertFrom-StringData -StringData $StringData -Delimiter $Delimiter
+
+        $key = $ExpectedResult.Keys
+
+        # validate the key in expected and result hashtables match
+        $Result.Keys | Should -BeExactly $ExpectedResult.Keys
+
+        # validate the values in expected and result hashtables match
+        $Result[$key] | Should -BeExactly $ExpectedResult.Values
+    }
+}
+
+Describe "AsLiteralString parameter tests" -Tags "CI" {
+
+    $AsLiteralStringCases = @(
+        @{ Delimiter = ':'; StringData = 'Path:/mnt/c/data/file.txt'; ExpectedResult = @{ Path = '/mnt/c/data/file.txt' } }
+        @{ Delimiter = ':'; StringData = 'Path:C:\data\file.txt' ; ExpectedResult = @{ Path = 'C:\data\file.txt' } }
+        @{ Delimiter = ':'; StringData = 'Path:\\localhost.example.com\data\file.txt' ; ExpectedResult = @{ Path = '\\localhost.example.com\data\file.txt' } }
+    )
+
+    It "Should still throw UnrecognizedEscape error if switch `$false" {
+        { ConvertFrom-StringData -StringData 'Path:C:\data\file.txt' -Delimiter ":" } | Should -Throw -ErrorId 'System.Text.RegularExpressions.RegexParseException,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand'
+    }
+
+    It "Should not throw UnrecognizedEscape error if switch `$true" {
+        { ConvertFrom-StringData -StringData 'Path:C:\data\file.txt' -Delimiter ":"  -AsLiteralString } | Should -Not -Throw -ErrorId 'System.Text.RegularExpressions.RegexParseException,Microsoft.PowerShell.Commands.ConvertFromStringDataCommand'
+    }
+
+    It "Should parse <StringData> without unescaping strings" -TestCases $AsLiteralStringCases {
+        param($Delimiter, $StringData, $ExpectedResult)
+
+        $Result = ConvertFrom-StringData -StringData $StringData -Delimiter $Delimiter -AsLiteralString
 
         $key = $ExpectedResult.Keys
 
