@@ -43,6 +43,25 @@ namespace Microsoft.PowerShell.Commands
         [Parameter(Position = 1)]
         public char Delimiter { get; set; } = '=';
 
+        private bool _AsLiteralString;
+
+        /// <summary>
+        /// Instructs cmdlet to not attempt a regex unescape on the output value
+        /// </summary>
+        [Parameter(Position = 2)]
+        public SwitchParameter AsLiteralString
+        {
+            get
+            {
+                return _AsLiteralString;
+            }
+
+            set
+            {
+                _AsLiteralString = value;
+            }
+        }
+
         /// <summary>
         /// </summary>
         protected override void ProcessRecord()
@@ -86,7 +105,10 @@ namespace Microsoft.PowerShell.Commands
                 string value = s.Substring(index + 1);
                 value = value.Trim();
 
-                value = Regex.Unescape(value);
+                if (!_AsLiteralString)
+                {
+                    value = Regex.Unescape(value);
+                }                
 
                 result.Add(name, value);
             }
